@@ -16,17 +16,28 @@ output:
 ### 1.1. **Cargar paquetes y datos**
 
 ```{r}
-library(tidyverse)
+library(tidyverse)   # Incluye dplyr, ggplot2, etc.
 library(lubridate)
 library(GGally)
 library(caret)
 library(recipes)
+library(MASS)        # Esto puede causar conflicto con select()
+library(Metrics)     # Para RMSE
+
+# función select es la de dplyr
+select <- dplyr::select
+
 
 # lectura del archivo
 walmart <- read_csv("walmart.csv")
+```
 
+```{r}
 # Estructura general
 glimpse(walmart)
+```
+
+```{r}
 summary(walmart)
 ```
 
@@ -80,14 +91,13 @@ ggplot(walmart, aes(x = Date, y = Weekly_Sales)) +
 ### 1.5. **Matriz de correlación entre variables continuas**
 
 ```{r}
-# Matriz de correlación
 cor_data <- walmart %>%
   select(all_of(vars_cont)) %>%
   na.omit()
-
 ggcorr(cor_data, label = TRUE, label_round = 2, hjust = 0.75, size = 3) +
   labs(title = "Matriz de correlación entre variables continuas")
 ```
+
 
 ### Conclusiones del EDA
 
@@ -173,9 +183,7 @@ walmart_test <- walmart_test %>%
 
 ### 2.3. **Pipeline de preprocesamiento con `recipes`**
 
-```{r}
-library(recipes)
-
+```{r warning=FALSE}
 # Creamos el recipe
 receta <- recipe(Weekly_Sales ~ ., data = walmart_train) %>%
   # 1. Imputación de valores faltantes
@@ -215,7 +223,7 @@ ctrl <- trainControl(
 
 #### 2.5.1. Regresión Lineal Múltiple
 
-```{r}
+```{r message=FALSE, warning=FALSE, results='hide'}
 set.seed(123)
 modelo_lm <- train(
   Weekly_Sales ~ ., 
@@ -224,12 +232,15 @@ modelo_lm <- train(
   trControl = ctrl,
   metric = "RMSE"
 )
+```
+
+```{r}
 print(modelo_lm)
 ```
 
 #### 2.5.2. Ridge Regression (`glmnet`)
 
-```{r}
+```{r message=FALSE, warning=FALSE, results='hide'}
 set.seed(123)
 modelo_ridge <- train(
   Weekly_Sales ~ ., 
@@ -239,12 +250,15 @@ modelo_ridge <- train(
   trControl = ctrl,
   metric = "RMSE"
 )
+```
+
+```{r}
 print(modelo_ridge)
 ```
 
 #### 2.5.3. LASSO Regression
 
-```{r}
+```{r message=FALSE, warning=FALSE, results='hide'}
 set.seed(123)
 modelo_lasso <- train(
   Weekly_Sales ~ ., 
@@ -254,12 +268,15 @@ modelo_lasso <- train(
   trControl = ctrl,
   metric = "RMSE"
 )
+```
+
+```{r}
 print(modelo_lasso)
 ```
 
 #### 2.5.4. Elastic Net
 
-```{r}
+```{r message=FALSE, warning=FALSE, results='hide'}
 set.seed(123)
 modelo_enet <- train(
   Weekly_Sales ~ ., 
@@ -269,22 +286,27 @@ modelo_enet <- train(
   trControl = ctrl,
   metric = "RMSE"
 )
+```
+
+```{r}
 print(modelo_enet)
 ```
 
 #### 2.5.5. Stepwise Regression
 
-```{r}
+```{r message=FALSE, warning=FALSE, results='hide'}
 # Stepwise con both directions (usando MASS::stepAIC)
-library(MASS)
 modelo_base <- lm(Weekly_Sales ~ ., data = train_ready)
 modelo_step <- stepAIC(modelo_base, direction = "both", trace = FALSE)
+```
+
+```{r}
 summary(modelo_step)
 ```
 
 #### 2.5.6. Random Forest
 
-```{r}
+```{r message=FALSE, warning=FALSE, results='hide'}
 set.seed(123)
 modelo_rf <- train(
   Weekly_Sales ~ ., 
@@ -293,12 +315,15 @@ modelo_rf <- train(
   trControl = ctrl,
   metric = "RMSE"
 )
+```
+
+```{r}
 print(modelo_rf)
 ```
 
 #### 2.5.7. SVR (Support Vector Regression)
 
-```{r}
+```{r message=FALSE, warning=FALSE, results='hide'}
 set.seed(123)
 modelo_svr <- train(
   Weekly_Sales ~ ., 
@@ -307,12 +332,15 @@ modelo_svr <- train(
   trControl = ctrl,
   metric = "RMSE"
 )
+```
+
+```{r}
 print(modelo_svr)
 ```
 
 #### 2.5.8. KNN
 
-```{r}
+```{r message=FALSE, warning=FALSE,  results='hide'}
 set.seed(123)
 modelo_knn <- train(
   Weekly_Sales ~ ., 
@@ -322,12 +350,15 @@ modelo_knn <- train(
   trControl = ctrl,
   metric = "RMSE"
 )
+```
+
+```{r}
 print(modelo_knn)
 ```
 
 #### 2.5.9. XGBoost
 
-```{r warning=FALSE}
+```{r message=FALSE, warning=FALSE, results='hide'}
 set.seed(123)
 modelo_xgb <- train(
   Weekly_Sales ~ ., 
@@ -336,6 +367,9 @@ modelo_xgb <- train(
   trControl = ctrl,
   metric = "RMSE"
 )
+```
+
+```{r}
 print(modelo_xgb)
 ```
 
@@ -344,8 +378,6 @@ print(modelo_xgb)
 ### 3.1. **Calcular predicciones y RMSE en test**
 
 ```{r}
-library(Metrics) # Para RMSE
-
 # Función para calcular RMSE en test
 calc_rmse <- function(modelo, datos_test, outcome = "Weekly_Sales") {
   pred <- predict(modelo, newdata = datos_test)
@@ -474,8 +506,6 @@ champion_resid <- champion_real - champion_pred
 ### 3.6. **Gráfico de Predicciones vs. Valores Reales**
 
 ```{r}
-library(ggplot2)
-
 # Dataframe para plot
 df_plot <- tibble(
   Real = champion_real,
