@@ -1,0 +1,576 @@
+---
+title: "R Notebook"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Lab 3: Walmart Sales Prediction
+
+**Nombre:** Francisco Gonzalez
+
+**Carnet:** 24002914
+
+## 1. **EDA – Exploratory Data Analysis**
+
+### 1.1. **Cargar paquetes y datos**
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(GGally)
+library(caret)
+library(recipes)
+
+# lectura del archivo
+walmart <- read_csv("walmart.csv")
+
+# Estructura general
+glimpse(walmart)
+summary(walmart)
+```
+
+### 1.2. **Gráficas de densidad para variables continuas**
+
+```{r}
+# Variables continuas a analizar
+vars_cont <- c("Weekly_Sales", "Temperature", "Fuel_Price", "CPI", "Unemployment")
+
+# Gráficas de densidad
+walmart %>%
+  pivot_longer(all_of(vars_cont), names_to = "variable", values_to = "valor") %>%
+  ggplot(aes(x = valor, fill = variable)) +
+  geom_density(alpha = 0.5) +
+  facet_wrap(~ variable, scales = "free") +
+  labs(title = "Gráficas de densidad para variables continuas")
+```
+
+### 1.3. **Gráficas de barras para Holiday_Flag y Store + boxplot con Weekly_Sales**
+
+```{r}
+# Gráfica de barras para Holiday_Flag
+ggplot(walmart, aes(x = as.factor(Holiday_Flag))) +
+  geom_bar(fill = "skyblue") +
+  labs(title = "Cantidad de semanas con y sin feriado", x = "Holiday_Flag", y = "Cantidad")
+
+# Gráfica de barras para Store
+ggplot(walmart, aes(x = as.factor(Store))) +
+  geom_bar(fill = "orange") +
+  labs(title = "Cantidad de registros por tienda", x = "Store", y = "Cantidad")
+
+# Boxplot: Weekly_Sales vs Holiday_Flag
+ggplot(walmart, aes(x = as.factor(Holiday_Flag), y = Weekly_Sales, fill = as.factor(Holiday_Flag))) +
+  geom_boxplot() +
+  labs(title = "Distribución de ventas por semanas con/ sin feriado", x = "Holiday_Flag")
+```
+
+### 1.4. **Serie temporal de Weekly_Sales**
+
+```{r}
+# Convertimos la fecha a formato Date
+walmart <- walmart %>%
+  mutate(Date = dmy(Date))
+
+# Serie temporal
+ggplot(walmart, aes(x = Date, y = Weekly_Sales)) +
+  geom_line(color = "dodgerblue") +
+  labs(title = "Ventas semanales a lo largo del tiempo", x = "Fecha", y = "Weekly Sales")
+```
+
+### 1.5. **Matriz de correlación entre variables continuas**
+
+```{r}
+# Matriz de correlación
+cor_data <- walmart %>%
+  select(all_of(vars_cont)) %>%
+  na.omit()
+
+ggcorr(cor_data, label = TRUE, label_round = 2, hjust = 0.75, size = 3) +
+  labs(title = "Matriz de correlación entre variables continuas")
+```
+
+### Conclusiones del EDA
+
+#### **A) Análisis de distribución de semanas con y sin feriado**
+
+La gran mayoría de las semanas en el dataset **no corresponden a semanas con feriado** (`Holiday_Flag = 0`). Solamente un pequeño porcentaje representa semanas con feriado (`Holiday_Flag = 1`). Esto indica que los feriados son eventos poco frecuentes, por lo que su efecto debe analizarse cuidadosamente ya que los datos están desbalanceados respecto a esta variable.
+
+#### **B) Registros por tienda**
+
+El número de registros es **muy uniforme entre tiendas**: cada tienda tiene aproximadamente la misma cantidad de semanas de ventas reportadas. Esto facilita los análisis comparativos y reduce el riesgo de sesgos por falta de datos en alguna tienda en particular.
+
+#### **C) Ventas en semanas con y sin feriado**
+
+El boxplot revela que, **en promedio, las semanas con feriado presentan ventas semanales mayores** respecto a las semanas sin feriado. Sin embargo, también hay más variabilidad y valores atípicos en semanas regulares. Esto sugiere que los feriados pueden ser un factor importante para explicar picos de ventas, pero no son el único.
+
+#### **D) Evolución temporal de ventas**
+
+El gráfico de serie temporal muestra una **fuerte variabilidad en las ventas semanales**, con algunos picos muy notorios en ciertas fechas (posiblemente asociados a eventos especiales o temporadas altas, como Black Friday o Navidad). Se observa cierta estacionalidad, aunque no perfectamente cíclica.
+
+#### **E) Correlación entre variables continuas**
+
+La matriz de correlación evidencia que **no existen relaciones lineales fuertes** entre las variables numéricas continuas y las ventas (`Weekly_Sales`).
+
+-   La mayor correlación (en valor absoluto) es entre `Unemployment` y `CPI` (-0.3).
+
+-   Entre las variables y las ventas, todas las correlaciones están entre -0.11 y +0.14, es decir, **muy bajas**.
+
+-   Esto indica que, para explicar las ventas, **es probable que se requieran modelos no lineales y que consideren interacciones entre variables**.
+
+#### **F) Distribución de variables continuas**
+
+Las densidades muestran que:
+
+-   **CPI** (Índice de Precios al Consumidor) y **Unemployment** tienen distribuciones multimodales, posiblemente debido a cambios económicos o a diferencias entre regiones/tiendas.
+
+-   **Fuel_Price** y **Temperature** presentan distribuciones bimodales y asimétricas, reflejando la variabilidad geográfica y estacional.
+
+-   **Weekly_Sales** tiene una distribución fuertemente asimétrica a la derecha, con una mayoría de ventas "normales" y algunos valores extremos (outliers de ventas altas).
+
+-   La **alta dispersión y presencia de outliers** en ventas justifica el uso de métricas robustas y modelos avanzados en la predicción.
+
+## Modelos de Regresión
+
+### 2.1 Partición de datos Train/Test
+
+```{r}
+set.seed(123) # Para reproducibilidad
+trainIndex <- createDataPartition(walmart$Weekly_Sales, p = 0.8, list = FALSE)
+walmart_train <- walmart[trainIndex, ]
+walmart_test  <- walmart[-trainIndex, ]
+
+# Revisa proporciones
+nrow(walmart_train)
+nrow(walmart_test)
+```
+
+### 2.2. **Ingeniería de variables sobre Date (con `lubridate`)**
+
+```{r}
+# Descomposición de la fecha y creación de nuevas variables
+walmart_train <- walmart_train %>%
+  mutate(
+    year = year(Date),
+    month = month(Date),
+    day = day(Date),
+    week = week(Date),
+    weekday = wday(Date, label = TRUE),
+    is_weekend = ifelse(weekday %in% c("Sat", "Sun"), 1, 0)
+  ) %>%
+  select(-Date) # Eliminamos la columna Date original
+
+walmart_test <- walmart_test %>%
+  mutate(
+    year = year(Date),
+    month = month(Date),
+    day = day(Date),
+    week = week(Date),
+    weekday = wday(Date, label = TRUE),
+    is_weekend = ifelse(weekday %in% c("Sat", "Sun"), 1, 0)
+  ) %>%
+  select(-Date)
+```
+
+### 2.3. **Pipeline de preprocesamiento con `recipes`**
+
+```{r}
+library(recipes)
+
+# Creamos el recipe
+receta <- recipe(Weekly_Sales ~ ., data = walmart_train) %>%
+  # 1. Imputación de valores faltantes
+  step_impute_median(all_numeric_predictors()) %>%
+  step_impute_mode(all_nominal_predictors()) %>%
+  # 2. Codificación de variables categóricas
+  step_dummy(all_nominal_predictors()) %>%
+  # 3. Tratamiento de outliers (Winsorización por ejemplo)
+  step_mutate_at(all_numeric_predictors(), fn = ~scales::squish(.x, quantile(.x, c(0.01, 0.99)))) %>%
+  # 4. Transformación de variables continuas (normalización)
+  step_YeoJohnson(all_numeric_predictors()) %>%
+  # 5. Escalado de variables
+  step_center(all_numeric_predictors()) %>%
+  step_scale(all_numeric_predictors())
+
+# Preparamos el recipe con el train
+receta_prep <- prep(receta, training = walmart_train)
+
+# Aplicamos la receta a train y test
+train_ready <- bake(receta_prep, walmart_train)
+test_ready  <- bake(receta_prep, walmart_test)
+```
+
+### 2.4. **Definir control de entrenamiento y validación cruzada (repeatedcv)**
+
+```{r}
+# Configuración de cross-validation repetida
+ctrl <- trainControl(
+  method = "repeatedcv",
+  number = 5, # número de folds
+  repeats = 3, # repeticiones
+  verboseIter = TRUE
+)
+```
+
+### 2.5. **Entrenamiento de modelos (usando `caret`)**
+
+#### 2.5.1. Regresión Lineal Múltiple
+
+```{r}
+set.seed(123)
+modelo_lm <- train(
+  Weekly_Sales ~ ., 
+  data = train_ready,
+  method = "lm",
+  trControl = ctrl,
+  metric = "RMSE"
+)
+print(modelo_lm)
+```
+
+#### 2.5.2. Ridge Regression (`glmnet`)
+
+```{r}
+set.seed(123)
+modelo_ridge <- train(
+  Weekly_Sales ~ ., 
+  data = train_ready,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 0, lambda = seq(0.0001, 1, length = 10)),
+  trControl = ctrl,
+  metric = "RMSE"
+)
+print(modelo_ridge)
+```
+
+#### 2.5.3. LASSO Regression
+
+```{r}
+set.seed(123)
+modelo_lasso <- train(
+  Weekly_Sales ~ ., 
+  data = train_ready,
+  method = "glmnet",
+  tuneGrid = expand.grid(alpha = 1, lambda = seq(0.0001, 1, length = 10)),
+  trControl = ctrl,
+  metric = "RMSE"
+)
+print(modelo_lasso)
+```
+
+#### 2.5.4. Elastic Net
+
+```{r}
+set.seed(123)
+modelo_enet <- train(
+  Weekly_Sales ~ ., 
+  data = train_ready,
+  method = "glmnet",
+  tuneLength = 10,
+  trControl = ctrl,
+  metric = "RMSE"
+)
+print(modelo_enet)
+```
+
+#### 2.5.5. Stepwise Regression
+
+```{r}
+# Stepwise con both directions (usando MASS::stepAIC)
+library(MASS)
+modelo_base <- lm(Weekly_Sales ~ ., data = train_ready)
+modelo_step <- stepAIC(modelo_base, direction = "both", trace = FALSE)
+summary(modelo_step)
+```
+
+#### 2.5.6. Random Forest
+
+```{r}
+set.seed(123)
+modelo_rf <- train(
+  Weekly_Sales ~ ., 
+  data = train_ready,
+  method = "rf",
+  trControl = ctrl,
+  metric = "RMSE"
+)
+print(modelo_rf)
+```
+
+#### 2.5.7. SVR (Support Vector Regression)
+
+```{r}
+set.seed(123)
+modelo_svr <- train(
+  Weekly_Sales ~ ., 
+  data = train_ready,
+  method = "svmRadial",
+  trControl = ctrl,
+  metric = "RMSE"
+)
+print(modelo_svr)
+```
+
+#### 2.5.8. KNN
+
+```{r}
+set.seed(123)
+modelo_knn <- train(
+  Weekly_Sales ~ ., 
+  data = train_ready,
+  method = "knn",
+  tuneLength = 10,
+  trControl = ctrl,
+  metric = "RMSE"
+)
+print(modelo_knn)
+```
+
+#### 2.5.9. XGBoost
+
+```{r warning=FALSE}
+set.seed(123)
+modelo_xgb <- train(
+  Weekly_Sales ~ ., 
+  data = train_ready,
+  method = "xgbTree",
+  trControl = ctrl,
+  metric = "RMSE"
+)
+print(modelo_xgb)
+```
+
+## 3. **Evaluación y Resumen de Modelos**
+
+### 3.1. **Calcular predicciones y RMSE en test**
+
+```{r}
+library(Metrics) # Para RMSE
+
+# Función para calcular RMSE en test
+calc_rmse <- function(modelo, datos_test, outcome = "Weekly_Sales") {
+  pred <- predict(modelo, newdata = datos_test)
+  rmse <- rmse(datos_test[[outcome]], pred)
+  return(rmse)
+}
+
+# Modelos tipo train() (los que no son lm() puro)
+rmse_lm     <- calc_rmse(modelo_lm, test_ready)
+rmse_ridge  <- calc_rmse(modelo_ridge, test_ready)
+rmse_lasso  <- calc_rmse(modelo_lasso, test_ready)
+rmse_enet   <- calc_rmse(modelo_enet, test_ready)
+rmse_rf     <- calc_rmse(modelo_rf, test_ready)
+rmse_svr    <- calc_rmse(modelo_svr, test_ready)
+rmse_knn    <- calc_rmse(modelo_knn, test_ready)
+rmse_xgb    <- calc_rmse(modelo_xgb, test_ready)
+
+# Stepwise (lm base)
+pred_step <- predict(modelo_step, newdata = test_ready)
+rmse_step <- rmse(test_ready$Weekly_Sales, pred_step)
+```
+
+### 3.2. **Extraer hiperparámetros y variables seleccionadas**
+
+```{r}
+# Extrae info relevante de cada modelo
+# Para lm y stepwise
+vars_lm     <- names(coef(modelo_lm$finalModel))
+vars_step   <- names(coef(modelo_step))
+
+# Para modelos glmnet
+vars_ridge  <- rownames(coef(modelo_ridge$finalModel, modelo_ridge$bestTune$lambda))
+vars_lasso  <- rownames(coef(modelo_lasso$finalModel, modelo_lasso$bestTune$lambda))[coef(modelo_lasso$finalModel, modelo_lasso$bestTune$lambda)[,1]!=0]
+vars_enet   <- rownames(coef(modelo_enet$finalModel, modelo_enet$bestTune$lambda))[coef(modelo_enet$finalModel, modelo_enet$bestTune$lambda)[,1]!=0]
+
+# Para los otros modelos, incluimos todas las variables predictoras
+vars_rf     <- modelo_rf$finalModel$xNames
+vars_svr    <- names(test_ready)[-which(names(test_ready) == "Weekly_Sales")]
+vars_knn    <- names(test_ready)[-which(names(test_ready) == "Weekly_Sales")]
+vars_xgb    <- names(test_ready)[-which(names(test_ready) == "Weekly_Sales")]
+```
+
+### 3.3. **Armar dataframe de resumen de resultados**
+
+```{r}
+# Armamos la tabla
+resultados <- tibble(
+  Id = 1:9,
+  Modelo = c(
+    "Regresión Lineal",
+    "Ridge",
+    "LASSO",
+    "Elastic Net",
+    "Stepwise",
+    "Random Forest",
+    "SVR",
+    "KNN",
+    "XGBoost"
+  ),
+  Hyperparametros = c(
+    NA,
+    paste("lambda=", modelo_ridge$bestTune$lambda),
+    paste("lambda=", modelo_lasso$bestTune$lambda),
+    paste("alpha=", modelo_enet$bestTune$alpha, "lambda=", modelo_enet$bestTune$lambda),
+    NA,
+    paste("mtry=", modelo_rf$bestTune$mtry),
+    paste("C=", modelo_svr$bestTune$C, "sigma=", modelo_svr$bestTune$sigma),
+    paste("k=", modelo_knn$bestTune$kmax),
+    paste("nrounds=", modelo_xgb$bestTune$nrounds)
+  ),
+  RMSE = c(
+    rmse_lm,
+    rmse_ridge,
+    rmse_lasso,
+    rmse_enet,
+    rmse_step,
+    rmse_rf,
+    rmse_svr,
+    rmse_knn,
+    rmse_xgb
+  ),
+  Variables = list(
+    vars_lm,
+    vars_ridge,
+    vars_lasso,
+    vars_enet,
+    vars_step,
+    vars_rf,
+    vars_svr,
+    vars_knn,
+    vars_xgb
+  )
+)
+```
+
+### 3.4. **Asignar el "Tag" (Champion, Challenger, Deprecated)**
+
+```{r}
+# Ordenamos por RMSE y taggeamos
+resultados <- resultados %>%
+  arrange(RMSE) %>%
+  mutate(
+    Tag = case_when(
+      row_number() == 1 ~ "Champion",
+      row_number() <= 3 ~ "Challenger",
+      TRUE ~ "Deprecated"
+    )
+  )
+print(resultados)
+```
+
+### 3.5. **Predicciones del modelo Champion**
+
+```{r}
+# Supón que modelo_xgb es el Champion. Cambia el nombre si tu Champion es otro.
+champion_pred <- predict(modelo_xgb, newdata = test_ready)
+champion_real <- test_ready$Weekly_Sales
+champion_resid <- champion_real - champion_pred
+
+# Si tu Champion es otro, por ejemplo modelo_rf, usa:
+# champion_pred <- predict(modelo_rf, newdata = test_ready)
+# champion_real <- test_ready$Weekly_Sales
+# champion_resid <- champion_real - champion_pred
+```
+
+### 3.6. **Gráfico de Predicciones vs. Valores Reales**
+
+```{r}
+library(ggplot2)
+
+# Dataframe para plot
+df_plot <- tibble(
+  Real = champion_real,
+  Prediccion = champion_pred
+)
+
+ggplot(df_plot, aes(x = Real, y = Prediccion)) +
+  geom_point(alpha = 0.4, color = "dodgerblue") +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed") +
+  labs(
+    title = "Predicción vs Valor Real",
+    x = "Valor Real",
+    y = "Predicción"
+  ) +
+  theme_minimal()
+```
+
+### 3. **Gráfico de Residuos vs Predicción**
+
+```{r}
+df_residuos <- tibble(
+  Prediccion = champion_pred,
+  Residuo = champion_resid
+)
+
+ggplot(df_residuos, aes(x = Prediccion, y = Residuo)) +
+  geom_point(alpha = 0.4, color = "tomato") +
+  geom_hline(yintercept = 0, color = "black", linetype = "dashed") +
+  labs(
+    title = "Residuos vs Predicción",
+    x = "Predicción",
+    y = "Residuo"
+  ) +
+  theme_minimal()
+```
+
+### 4. **Histograma de Residuos**
+
+```{r}
+ggplot(df_residuos, aes(x = Residuo)) +
+  geom_histogram(bins = 30, fill = "purple", color = "white", alpha = 0.7) +
+  labs(
+    title = "Histograma de residuos",
+    x = "Residuo",
+    y = "Frecuencia"
+  ) +
+  theme_minimal()
+```
+
+### 3.5. **Comentario final sobre los resultados**
+
+#### **A) Selección de Modelo Champion**
+
+-   El modelo **XGBoost** resultó ser el "Champion", logrando el menor RMSE en el set de test (RMSE ≈ **90,138.42**).
+
+-   Supera significativamente al resto de modelos, especialmente a los tradicionales como regresión lineal múltiple y modelos penalizados, así como a otros algoritmos de machine learning como Random Forest y SVR.
+
+#### **B) Desempeño General de Modelos**
+
+-   El segundo mejor modelo fue **Random Forest** (RMSE ≈ 114,762), y KNN se ubicó como Challenger, aunque con una diferencia considerable respecto al Champion.
+
+-   Los modelos lineales (regresión, ridge, lasso, elastic net y stepwise) mostraron un desempeño mucho más bajo, evidenciando que la relación entre las variables y las ventas semanales es **altamente no lineal y compleja**, justificando el uso de modelos de boosting.
+
+#### **C) Diagnóstico Gráfico del Modelo Champion**
+
+##### **a) Predicción vs Valor Real**
+
+-   El gráfico muestra que los puntos están muy alineados respecto a la línea diagonal roja, indicando que las predicciones del modelo Champion son **muy cercanas a los valores reales** para la mayoría de los casos.
+
+-   Hay pocos puntos alejados, lo que indica un bajo número de outliers o errores grandes.
+
+##### **b) Residuos vs Predicción**
+
+-   Los residuos se distribuyen de manera simétrica en torno al cero, con mayor concentración cerca de los valores bajos y medianos de predicción.
+
+-   No se observa un patrón sistemático (no hay curvaturas ni "bandas" verticales claras), lo que indica que el modelo no deja sesgos estructurales importantes sin explicar.
+
+-   Hay cierta dispersión en predicciones altas, pero es esperable dado el rango de ventas semanales (outliers naturales en negocios de retail).
+
+##### **c) Histograma de Residuos**
+
+-   Los residuos siguen una distribución **aproximadamente normal y centrada en cero**, con la mayoría de errores menores a ±100,000.
+
+-   La cola derecha indica algunos casos de ventas atípicamente altas o bajas donde el modelo no acierta completamente, pero son pocos casos.
+
+#### **D) Recomendaciones y Hallazgos**
+
+-   El modelo Champion (XGBoost) **captura muy bien la complejidad del problema**, siendo robusto ante las variaciones semanales y capaz de explicar la variabilidad de ventas incluso con factores externos y estacionales.
+
+-   Para producción o recomendaciones reales, se sugiere mantener este modelo, pero monitorear outliers (ventas extremadamente altas/bajas) e investigar los casos atípicos.
+
+-   La baja performance de modelos lineales indica que la relación de las variables predictoras con las ventas es compleja y potencialmente dependiente de interacciones, no solo efectos simples.
+
+### 3.6. **Guardar los resultados a CSV**
+
+```{r}
+write_csv(resultados, "resultados_modelos_walmart.csv")
+```
