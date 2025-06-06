@@ -1,0 +1,281 @@
+---
+title: "Lab 3 Ejercicio 2"
+format: html
+editor: visual
+---
+
+# Algoritmos de Machine Learning para Regresión
+
+**Nombre:** Francisco Gonzalez
+
+**Carnet:** 24002914
+
+## Introducción
+
+Este documento presenta una investigación sobre diversos algoritmos de *machine learning* aplicados a problemas de regresión. Se analizan los siguientes modelos:
+
+1.  Árboles de Decisión para Regresión
+
+2.  K-Nearest Neighbors (K-NN) para Regresión
+
+3.  Support Vector Regression (SVR)
+
+4.  Modelos de Ensamble:
+
+-   Random Forest
+
+-   Gradient Boosting
+
+-   XGBoost
+
+-   AdaBoost
+
+## 1. Árboles de Decisión para Regresión
+
+![](images/clipboard-2450521628.png)
+
+**¿Cómo funciona el algoritmo?**
+
+Divide datos en nodos según características.
+
+**¿Para qué casos es bueno este algoritmo?**
+
+Datos no lineales y fáciles de interpretar.
+
+**¿Para qué casos no es bueno este algoritmo?**
+
+Datos ruidosos o con muchas variables.
+
+**¿Cuál es la complejidad computacional de este algoritmo?**
+
+O(n log n) en promedio.
+
+**¿Qué ventajas tiene este algoritmo sobre los demás?**
+
+Fácil interpretación y visualización.
+
+**¿Qué desventajas tiene este algoritmo sobre los demás?**
+
+Propenso al sobreajuste.
+
+**Hiperparámetros clave**
+
+Profundidad máxima, mínimo de muestras por hoja.
+
+## 2. K-Nearest Neighbors (K-NN) para Regresión
+
+![](images/clipboard-3363774710.png)
+
+**¿Cómo funciona el algoritmo?**
+
+Predice promedio de vecinos más cercanos.
+
+**¿Para qué casos es bueno este algoritmo?**
+
+Datos con patrones locales claros.
+
+**¿Para qué casos no es bueno este algoritmo?**
+
+Datos de alta dimensión o grandes volúmenes.
+
+**¿Cuál es la complejidad computacional de este algoritmo?**
+
+O(n) por predicción.
+
+**¿Qué ventajas tiene este algoritmo sobre los demás?**
+
+Simplicidad y sin entrenamiento previo.
+
+**¿Qué desventajas tiene este algoritmo sobre los demás?**
+
+Lento con grandes conjuntos de datos.
+
+**Hiperparámetros clave**
+
+Número de vecinos (k), métrica de distancia.
+
+## 3. Support Vector Regression (SVR)
+
+![](images/clipboard-3283768188.png)
+
+**¿Cómo funciona el algoritmo?**
+
+Encuentra hiperplano que minimiza error dentro de margen.
+
+**¿Para qué casos es bueno este algoritmo?**
+
+Datos con relaciones no lineales complejas.
+
+**¿Para qué casos no es bueno este algoritmo?**
+
+Grandes conjuntos de datos.
+
+**¿Cuál es la complejidad computacional de este algoritmo?**
+
+Entre O(n²) y O(n³).
+
+**¿Qué ventajas tiene este algoritmo sobre los demás?**
+
+Robusto a valores atípicos.
+
+**¿Qué desventajas tiene este algoritmo sobre los demás?**
+
+Difícil de ajustar y lento en entrenamiento.
+
+**Hiperparámetros clave**
+
+C, epsilon, tipo de kernel.
+
+## 4. Modelos de Ensamble
+
+### 4a. Random Forest
+
+**¿Cómo funciona el algoritmo?**
+
+Promedia múltiples árboles de decisión aleatorios.
+
+**¿Para qué casos es bueno este algoritmo?**
+
+Datos con muchas características y relaciones complejas.
+
+**¿Para qué casos no es bueno este algoritmo?**
+
+Necesidad de interpretabilidad detallada.
+
+**¿Cuál es la complejidad computacional de este algoritmo?**
+
+O(m \* n log n), m = número de árboles.
+
+**¿Qué ventajas tiene este algoritmo sobre los demás?**
+
+Reduce sobreajuste y mejora precisión.
+
+**¿Qué desventajas tiene este algoritmo sobre los demás?**
+
+Modelo grande y menos interpretable.
+
+**Hiperparámetros clave**
+
+Número de árboles, profundidad máxima.
+
+### 4b. Gradient Boosting
+
+**¿Cómo funciona el algoritmo?**
+
+Construye árboles secuenciales minimizando errores anteriores.
+
+**¿Para qué casos es bueno este algoritmo?**
+
+Datos con patrones complejos y no lineales.
+
+**¿Para qué casos no es bueno este algoritmo?**
+
+Datos ruidosos o con muchas variables irrelevantes.
+
+**¿Cuál es la complejidad computacional de este algoritmo?**
+
+O(m \* n log n), m = número de árboles.
+
+**¿Qué ventajas tiene este algoritmo sobre los demás?**
+
+Alta precisión y flexibilidad.
+
+**¿Qué desventajas tiene este algoritmo sobre los demás?**
+
+Propenso al sobreajuste si no se regula.
+
+**Hiperparámetros clave**
+
+Tasa de aprendizaje, número de árboles.
+
+### 4c. XGBoost
+
+**¿Cómo funciona el algoritmo?**
+
+Implementación optimizada de Gradient Boosting.
+
+**¿Para qué casos es bueno este algoritmo?**
+
+Competencias y grandes conjuntos de datos.
+
+**¿Para qué casos no es bueno este algoritmo?**
+
+Necesidad de interpretabilidad sencilla.
+
+**¿Cuál es la complejidad computacional de este algoritmo?**
+
+O(m \* n log n), altamente optimizado.
+
+**¿Qué ventajas tiene este algoritmo sobre los demás?**
+
+Rendimiento superior y regularización incorporada
+
+**¿Qué desventajas tiene este algoritmo sobre los demás?**
+
+Complejidad en ajuste de hiperparámetros.
+
+**Hiperparámetros clave**
+
+Tasa de aprendizaje, profundidad máxima, lambda.
+
+### 4d. AdaBoost
+
+**¿Cómo funciona el algoritmo?**
+
+Combina clasificadores débiles ponderando errores.
+
+**¿Para qué casos es bueno este algoritmo?**
+
+Datos con ruido moderado y patrones claros.
+
+**¿Para qué casos no es bueno este algoritmo?**
+
+Datos muy ruidosos o con muchos valores atípicos.
+
+**¿Cuál es la complejidad computacional de este algoritmo?**
+
+O(m \* n), m = número de iteraciones.
+
+**¿Qué ventajas tiene este algoritmo sobre los demás?**
+
+Mejora precisión de clasificadores simples.
+
+**¿Qué desventajas tiene este algoritmo sobre los demás?**
+
+Sensibilidad a datos ruidosos y valores atípicos.
+
+**Hiperparámetros clave**
+
+Número de estimadores, tasa de aprendizaje.
+
+## Referencias
+
+**1. Árboles de Decisión para Regresión**
+
+Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., ... & Duchesnay, É. (2011). Decision Tree Regression. *Scikit-learn Documentation*. Recuperado de <https://scikit-learn.org/stable/auto_examples/tree/plot_tree_regression.html>[[scikit-learn.org+11scikit-learn.org+11scikit-learn.org+11]{.underline}](https://scikit-learn.org/stable/auto_examples/tree/plot_tree_regression.html?utm_source=chatgpt.com){alt="https://scikit-learn.org/stable/auto_examples/tree/plot_tree_regression.html?utm_source=chatgpt.com"}
+
+**2. K-Nearest Neighbors (K-NN) para Regresión**
+
+Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., ... & Duchesnay, É. (2011). KNeighborsRegressor. *Scikit-learn Documentation*. Recuperado de <https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsRegressor.html>[[scikit-learn.org+1scikit-learn.org+1]{.underline}](https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsRegressor.html?utm_source=chatgpt.com){alt="https://scikit-learn.org/stable/modules/generated/sklearn.neighbors.KNeighborsRegressor.html?utm_source=chatgpt.com"}
+
+**3. Support Vector Regression (SVR)**
+
+Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., ... & Duchesnay, É. (2011). SVR. *Scikit-learn Documentation*. Recuperado de <https://scikit-learn.org/stable/modules/generated/sklearn.svm.SVR.html>
+
+**4. Ensambles para Regresiones**
+
+**a. Random Forest**
+
+Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., ... & Duchesnay, É. (2011). RandomForestRegressor. *Scikit-learn Documentation*. Recuperado de <https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestRegressor.html>[[scikit-learn.org+7scikit-learn.org+7scikit-learn.org+7]{.underline}](https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestRegressor.html?utm_source=chatgpt.com){alt="https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.RandomForestRegressor.html?utm_source=chatgpt.com"}
+
+**b. Gradient Boosting**
+
+Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., ... & Duchesnay, É. (2011). Gradient Boosting Regression. *Scikit-learn Documentation*. Recuperado de <https://scikit-learn.org/stable/auto_examples/ensemble/plot_gradient_boosting_regression.html>[[scikit-learn.org+7scikit-learn.org+7scikit-learn.org+7]{.underline}](https://scikit-learn.org/stable/auto_examples/ensemble/plot_gradient_boosting_regression.html?utm_source=chatgpt.com){alt="https://scikit-learn.org/stable/auto_examples/ensemble/plot_gradient_boosting_regression.html?utm_source=chatgpt.com"}
+
+**c. XGBoost**
+
+Chen, T., & Guestrin, C. (2016). Introduction to Boosted Trees. *XGBoost Documentation*. Recuperado de <https://xgboost.readthedocs.io/en/stable/tutorials/model.html>[[xgboost.readthedocs.io]{.underline}](https://xgboost.readthedocs.io/en/stable/tutorials/model.html?utm_source=chatgpt.com){alt="https://xgboost.readthedocs.io/en/stable/tutorials/model.html?utm_source=chatgpt.com"}
+
+**d. AdaBoost**
+
+Pedregosa, F., Varoquaux, G., Gramfort, A., Michel, V., Thirion, B., Grisel, O., ... & Duchesnay, É. (2011). AdaBoostRegressor. *Scikit-learn Documentation*. Recuperado de <https://scikit-learn.org/stable/modules/generated/sklearn.ensemble.AdaBoostRegressor.html>
