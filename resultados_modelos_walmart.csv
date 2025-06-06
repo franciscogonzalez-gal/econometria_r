@@ -1,0 +1,10 @@
+Id,Modelo,Hyperparametros,RMSE,Variables,Tag
+9,XGBoost,nrounds= 150,89414.7618510758,,Champion
+6,Random Forest,mtry= 17,114762.4175447773,,Challenger
+8,KNN,k= ,454135.3860233667,,Challenger
+2,Ridge,lambda= 1,529006.0745486062,,Deprecated
+4,Elastic Net,alpha= 0.9 lambda= 89.4411646619899,529500.4161310577,,Deprecated
+3,LASSO,lambda= 1,529501.5067682943,,Deprecated
+1,Regresión Lineal,NA,529870.232863018,,Deprecated
+5,Stepwise,NA,529870.232863018,,Deprecated
+7,SVR,C= 1 sigma= 0.0798933042025618,565502.1167545139,,Deprecated
