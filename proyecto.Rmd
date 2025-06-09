@@ -1,0 +1,473 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Proyecto Final: Competencia de Kaggle
+
+**Nombre:** Francisco Gonzalez
+
+**Carnet:** 24002914
+
+## Carga de librerias
+
+```{r}
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(corrplot)
+library(tidyr)
+```
+
+## Carga del archivo train
+
+```{r}
+# 1. Cargar los datos
+df <- read_csv("train.csv")
+```
+
+## EDA
+
+```{r}
+# 2. Descripción general del dataset
+cat("Dimensiones del dataset:\n")
+dim(df)
+```
+
+```{r}
+cat("\nPrimeras filas:\n")
+print(head(df))
+```
+
+```{r}
+cat("\nResumen estadístico:\n")
+print(summary(df))
+```
+
+```{r}
+cat("\nTipos de datos:\n")
+str(df)
+```
+
+```{r}
+# 3. Revisión de valores nulos
+cat("\nConteo de valores NA por variable:\n")
+print(colSums(is.na(df)))
+
+```
+
+```{r}
+# 4. Distribución de variables numéricas
+num_vars <- df %>% select(where(is.numeric)) %>% select(-id)
+
+for (col in names(num_vars)) {
+  print(
+    ggplot(df, aes_string(x = col)) +
+      geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+      labs(title = paste("Histograma de", col), x = col, y = "Frecuencia")
+  )
+}
+```
+
+```{r}
+# 5. Distribución de variable categórica (ocean_proximity)
+print(
+  ggplot(df, aes(x = ocean_proximity)) +
+    geom_bar(fill = "coral") +
+    labs(title = "Conteo por categoría: ocean_proximity", x = "ocean_proximity", y = "Frecuencia") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+)
+```
+
+```{r}
+# 6. Correlación entre variables numéricas
+corr <- cor(num_vars, use = "complete.obs")
+print(corrplot(corr, method = "color", tl.cex = 0.7, number.cex = 0.7))
+```
+
+```{r}
+# 7. Boxplots de precio de vivienda vs. proximidad al océano
+print(
+  ggplot(df, aes(x = ocean_proximity, y = median_house_value)) +
+    geom_boxplot(fill = "lightgreen") +
+    labs(title = "Distribución de precio de vivienda por proximidad al océano",
+         x = "ocean_proximity", y = "median_house_value") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1))
+)
+```
+
+```{r}
+# 8. Gráfico de dispersión: median_income vs. median_house_value
+print(
+  ggplot(df, aes(x = median_income, y = median_house_value, color = ocean_proximity)) +
+    geom_point(alpha = 0.6) +
+    labs(title = "Ingreso medio vs. precio de vivienda",
+         x = "median_income", y = "median_house_value")
+)
+```
+
+```{r}
+# 9. Mapa de localización: latitude vs longitude coloreado por precio de vivienda
+library(ggplot2)         # Por si no está cargado
+library(ggmap)          # Por si no está cargado
+
+
+# Puedes usar el centro geográfico (centro de tus datos)
+# Definir el centro de tus datos
+centro <- c(lon = mean(df$longitude), lat = mean(df$latitude))
+
+ggmap::register_google(key = Sys.getenv("GOOGLE_API_KEY"))
+
+ggmap::has_google_key()
+
+
+map <- get_googlemap(
+  center = centro,
+  zoom = 6,
+  size = c(640, 640),
+  scale = 1,
+  maptype = "terrain"
+)
+# Crear un dataframe solo con las filas completas para las columnas relevantes
+df_mapa <- df %>% 
+  filter(!is.na(longitude), !is.na(latitude), !is.na(median_house_value))
+
+# Usar este dataframe limpio en tu gráfico
+ggmap(map) +
+  geom_point(
+    data = df_mapa,
+    aes(x = longitude, y = latitude, color = median_house_value),
+    alpha = 0.7, size = 2
+  ) +
+  scale_color_viridis_c() +
+  labs(
+    title = "Valor medio de vivienda en mapa Google",
+    x = "Longitud", y = "Latitud",
+    color = "Median House Value"
+  ) +
+  theme(legend.position = "right")
+
+```
+
+### Conclusiones EDA
+
+**1. Boxplot: Precio de vivienda según proximidad al océano**
+
+-   **Los precios más altos** de vivienda están en las categorías `ISLAND`, `NEAR BAY` y `NEAR OCEAN`.
+
+-   La **categoría `INLAND` tiene los precios más bajos** y además más dispersión (muchos valores bajos, algunos altos como outliers).
+
+-   Vivir cerca de la costa o la bahía está claramente asociado a un mayor valor de las viviendas.
+
+**2. Dispersión: Ingreso medio vs. precio de vivienda**
+
+-   Hay una **fuerte correlación positiva**: a mayor ingreso medio, mayor valor medio de la vivienda.
+
+-   Existe un “tope” aparente en el precio de la vivienda (muchos puntos pegados en \$500,000), lo que indica un **capping** (probablemente un límite superior en el dataset original).
+
+-   Las viviendas cerca del océano y bahía suelen estar asociadas tanto a mayores ingresos como a mayores valores de vivienda.
+
+**3. Mapa geográfico: Precio de vivienda en California**
+
+-   **Las áreas costeras**, especialmente el área de la bahía de San Francisco y zonas de Los Ángeles, muestran valores de vivienda mucho más altos (zonas amarillas y verdes claros).
+
+-   El interior del estado (INLAND) tiene predominantemente valores bajos (púrpuras y azules).
+
+-   **Patrón geográfico claro:** el precio aumenta al acercarse al océano y áreas urbanas principales.
+
+**4. Matriz de correlación**
+
+-   La mayor correlación positiva es entre **ingreso medio y valor de vivienda**.
+
+-   Otras variables con alta correlación son **total_rooms, households, population**, pero con menos impacto directo en el precio.
+
+-   **Latitude y longitude** muestran cierta relación geográfica pero no directa con el precio (son proxies de ubicación).
+
+**Conclusiones generales**
+
+-   **La variable más predictiva para el valor de la vivienda es el ingreso medio del área.**
+
+-   La **proximidad al océano** y bahías tiene un gran impacto positivo en el precio de la vivienda.
+
+-   **Existe un límite superior artificial** en el valor de la vivienda, que puede distorsionar modelos predictivos si no se considera.
+
+-   **El patrón espacial** es clave: las zonas urbanas costeras concentran los precios más altos.
+
+-   Las variables relacionadas con tamaño de la vivienda y número de hogares/población tienen relación entre sí pero menor impacto directo en el precio.
+
+## Entrenamiento inicial de modelos (Reg.Lineal, Arbol de Decision, Random Forest)
+
+```{r}
+library(tidymodels)
+
+# 1. Cargar datos
+# 1. Cargar datos originales
+train <- readr::read_csv("train.csv")
+
+
+
+```
+
+```{r}
+# 2. Dividir en entrenamiento (80%) y prueba (20%)
+set.seed(42)
+split <- initial_split(train, prop = 0.8, strata = median_house_value)
+train_split <- training(split)
+test_split  <- testing(split)
+```
+
+```{r}
+# 3. Preprocesamiento
+receta <- recipe(median_house_value ~ ., data = train_split) %>%
+  update_role(id, new_role = "ID") %>%
+  step_impute_median(all_numeric_predictors()) %>%    # Imputa medianas para predictores numéricos
+  step_impute_mode(all_nominal_predictors()) %>%      # Imputa moda para categóricos (factor o chr)
+  step_dummy(all_nominal_predictors()) %>%
+  step_zv(all_predictors())
+```
+
+```{r}
+# 3. Preparar receta en train, aplicar en test
+prep_receta <- prep(receta, training = train_split)
+train_prep <- bake(prep_receta, new_data = train_split)
+test_prep  <- bake(prep_receta, new_data = test_split)
+```
+
+```{r}
+# 4. Especificación de modelos
+
+# a) Regresión Lineal
+modelo_lm <- linear_reg() %>% set_engine("lm")
+
+# b) Árbol de Decisión
+modelo_tree <- decision_tree() %>%
+  set_engine("rpart") %>%
+  set_mode("regression")
+
+# c) Random Forest
+modelo_rf <- rand_forest(trees = 100) %>%
+  set_engine("ranger") %>%
+  set_mode("regression")
+
+```
+
+```{r}
+# 5. Entrenamiento
+# Regresión Lineal
+modelo_lm <- linear_reg() %>% set_engine("lm")
+ajuste_lm <- fit(modelo_lm, median_house_value ~ ., data = train_prep)
+pred_lm <- predict(ajuste_lm, new_data = test_prep) %>%
+  bind_cols(test_prep)
+rmse_lm <- rmse(pred_lm, truth = median_house_value, estimate = .pred)
+
+# Árbol de decisión
+modelo_tree <- decision_tree() %>% set_engine("rpart") %>% set_mode("regression")
+ajuste_tree <- fit(modelo_tree, median_house_value ~ ., data = train_prep)
+pred_tree <- predict(ajuste_tree, new_data = test_prep) %>%
+  bind_cols(test_prep)
+rmse_tree <- rmse(pred_tree, truth = median_house_value, estimate = .pred)
+
+# Random Forest
+modelo_rf <- rand_forest(trees = 100) %>% set_engine("ranger") %>% set_mode("regression")
+ajuste_rf <- fit(modelo_rf, median_house_value ~ ., data = train_prep)
+pred_rf <- predict(ajuste_rf, new_data = test_prep) %>%
+  bind_cols(test_prep)
+rmse_rf <- rmse(pred_rf, truth = median_house_value, estimate = .pred)
+```
+
+```{r}
+# Comparar resultados
+resultados <- tibble(
+  Modelo = c("Regresión Lineal", "Árbol de Decisión", "Random Forest"),
+  RMSE = c(rmse_lm$.estimate, rmse_tree$.estimate, rmse_rf$.estimate)
+)
+print(resultados)
+
+```
+
+```{r}
+# Visualización para el mejor modelo
+library(ggplot2)
+ggplot(pred_rf, aes(x = median_house_value, y = .pred)) +
+  geom_point(alpha = 0.3, color = "blue") +
+  geom_abline(slope = 1, intercept = 0, color = "red") +
+  labs(
+    title = "Random Forest: Real vs Predicho",
+    x = "Valor real", y = "Valor predicho"
+  )
+```
+
+## Entrenamiento de Modelos(XGBosst, Lasso/Rige, KKNN, SVM
+
+```{r}
+# Elimina filas con NA en test_prep antes de cualquier predicción
+test_prep_clean <- test_prep %>% drop_na()
+
+# XGBoost
+modelo_xgb <- boost_tree(trees = 500, learn_rate = 0.05) %>%
+  set_engine("xgboost") %>%
+  set_mode("regression")
+ajuste_xgb <- fit(modelo_xgb, median_house_value ~ ., data = train_prep)
+pred_xgb  <- predict(ajuste_xgb,  new_data = test_prep_clean) %>% bind_cols(test_prep_clean)
+rmse_xgb  <- rmse(pred_xgb, truth = median_house_value, estimate = .pred)
+
+# Lasso/Ridge/Elastic Net (Elastic Net general)
+modelo_enet <- linear_reg(penalty = 0.1, mixture = 0.5) %>% # Cambia penalty/mixture para probar lasso/ridge
+  set_engine("glmnet")
+ajuste_enet <- fit(modelo_enet, median_house_value ~ ., data = train_prep)
+pred_enet <- predict(ajuste_enet, new_data = test_prep_clean) %>% bind_cols(test_prep_clean)
+rmse_enet <- rmse(pred_enet, truth = median_house_value, estimate = .pred)
+
+# Support Vector Machine (SVM)
+modelo_svm <- svm_rbf(cost = 1, rbf_sigma = 0.1) %>%
+  set_engine("kernlab") %>%
+  set_mode("regression")
+ajuste_svm <- fit(modelo_svm, median_house_value ~ ., data = train_prep)
+pred_svm  <- predict(ajuste_svm,  new_data = test_prep_clean) %>% bind_cols(test_prep_clean)
+rmse_svm  <- rmse(pred_svm, truth = median_house_value, estimate = .pred)
+
+# KNN
+modelo_knn <- nearest_neighbor(neighbors = 10) %>%
+  set_engine("kknn") %>%
+  set_mode("regression")
+ajuste_knn <- fit(modelo_knn, median_house_value ~ ., data = train_prep)
+pred_knn  <- predict(ajuste_knn,  new_data = test_prep_clean) %>% bind_cols(test_prep_clean)
+rmse_knn  <- rmse(pred_knn, truth = median_house_value, estimate = .pred)
+```
+
+```{r}
+# 4. Comparación de resultados
+resultados <- tibble(
+  Modelo = c("XGBoost", "Elastic Net", "SVM", "KNN"),
+  RMSE = c(rmse_xgb$.estimate, rmse_enet$.estimate, rmse_svm$.estimate, rmse_knn$.estimate)
+)
+print(resultados)
+```
+
+```{r}
+# 5. Visualización real vs predicho para el mejor modelo (ejemplo con XGBoost)
+library(ggplot2)
+ggplot(pred_xgb, aes(x = median_house_value, y = .pred)) +
+  geom_point(alpha = 0.3, color = "darkgreen") +
+  geom_abline(slope = 1, intercept = 0, color = "red") +
+  labs(
+    title = "XGBoost: Real vs Predicho",
+    x = "Valor real", y = "Valor predicho"
+  )
+```
+
+
+
+
+
+## Generar archivo de salida
+
+```{r}
+# 1. Cargar el test de Kaggle y prepararlo igual que test_prep_clean
+test_kaggle <- readr::read_csv("test.csv")
+
+# 2. Preprocesar test_kaggle exactamente igual que tu test interno
+test_kaggle_prep <- bake(prep_receta, new_data = test_kaggle) %>% drop_na()
+
+# 3. Predecir con el modelo entrenado en train_prep
+predicciones_kaggle <- predict(ajuste_xgb, new_data = test_kaggle_prep)
+
+# 4. Recuperar el id de test original para el archivo de submission
+# Asumiendo que 'id' NO fue eliminado en la preparación y sigue el mismo orden
+# Si se eliminaron filas con NA, hay que filtrar el id igual que las filas válidas
+
+# Recuperar los ids válidos (correspondientes a test_kaggle_prep)
+ids_validos <- test_kaggle$id[as.numeric(rownames(test_kaggle_prep))]
+
+# 5. Crear el archivo de salida
+submission <- tibble(
+  id = ids_validos,
+  median_house_value = predicciones_kaggle$.pred
+)
+
+# 6. Guardar archivo CSV
+readr::write_csv(submission, "submission.csv")
+```
+## Ajuste de hiperparametros de XGBosst
+
+```{r}
+# 1. Cargar datos y dividir en entrenamiento y prueba interna
+set.seed(42)
+train <- readr::read_csv("train.csv")
+split <- initial_split(train, prop = 0.8, strata = median_house_value)
+train_split <- training(split)
+test_split  <- testing(split)
+
+# 2. Definir la receta de preprocesamiento
+receta <- recipe(median_house_value ~ ., data = train_split) %>%
+  update_role(id, new_role = "ID") %>%          # ID no es predictor
+  step_naomit(all_predictors(), all_outcomes()) %>%
+  step_dummy(all_nominal_predictors()) %>%      # Convertir categorías a dummies
+  step_zv(all_predictors())                     # Eliminar predictores con varianza cero
+
+# 3. Definir el modelo XGBoost con hiperparámetros a tunear
+modelo_xgb_tune <- boost_tree(
+  trees = 500,
+  learn_rate = tune(),
+  mtry = tune(),
+  tree_depth = tune(),
+  min_n = tune(),
+  loss_reduction = tune(),
+  sample_size = tune()
+) %>%
+  set_engine("xgboost") %>%
+  set_mode("regression")
+
+# 4. Crear workflow
+wf <- workflow() %>%
+  add_recipe(receta) %>%
+  add_model(modelo_xgb_tune)
+
+# 5. Crear los folds para validación cruzada (aún sin preparar)
+set.seed(42)
+cv_folds <- vfold_cv(train_split, v = 5, strata = median_house_value)
+
+param_grid <- grid_space_filling(
+  learn_rate(range = c(0.1, 0.3)),         # por defecto: 0.3
+  mtry(range = c(6, 8)),                   # por defecto: número total de predictores
+  tree_depth(range = c(6, 10)),            # por defecto: 6
+  min_n(range = c(1, 10)),                 # por defecto: 1
+  loss_reduction(range = c(0, 1)),         # por defecto: 0
+  sample_size = sample_prop(range = c(0.8, 1)),  # por defecto: 1
+  size = 20
+)
+
+# 7. Tuning con tune_grid
+ctrl <- control_grid(save_pred = TRUE, verbose = TRUE)
+
+set.seed(42)
+tune_res <- tune_grid(
+  wf,
+  resamples = cv_folds,
+  grid = param_grid,
+  metrics = metric_set(rmse),
+  control = ctrl
+)
+
+# 8. Seleccionar la mejor combinación de hiperparámetros
+best_params <- select_best(tune_res, metric = "rmse")
+print(best_params)
+
+# 9. Finalizar workflow con mejores hiperparámetros
+final_wf <- finalize_workflow(wf, best_params)
+```
+
+```{r}
+# ...resto del pipeline igual...
+
+# 10. Ajustar el modelo final al conjunto completo de train_split
+ajuste_final <- fit(final_wf, data = train_split)
+
+# 11. Predecir directamente sobre el set crudo (no preparado)
+pred_final <- predict(ajuste_final, new_data = test_split) %>% bind_cols(test_split)
+
+# 12. Calcular RMSE
+rmse_final <- rmse(pred_final, truth = median_house_value, estimate = .pred)
+print(rmse_final)
+
+```
