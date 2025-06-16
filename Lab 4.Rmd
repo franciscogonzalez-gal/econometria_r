@@ -1,0 +1,323 @@
+---
+title: "Laboratorio 4"
+output:
+  html_document:
+    df_print: paged
+---
+
+**Nombre:** Francisco Gonzalez
+
+**Carnet:** 24002914
+
+### **Parte 1 – Carga de Datos**
+
+CopiarEditar
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(forecast)
+library(tseries)
+library(nnfor)
+library(dplyr)
+library(tidyr)
+
+# 1. Cargar el dataset
+cpi <- read_csv("CPI.csv")
+
+# 2. Eliminar valores NA si existen y convertir a fecha
+
+cpi <- cpi %>%
+  mutate(date = mdy(date)) %>%
+  drop_na() %>%
+  arrange(date)
+
+
+# 3. Crear variable tipo time_series (ts)
+# cear serie de fechas completas
+fecha_completa <- seq.Date(min(cpi$date), max(cpi$date), by = "day")
+
+#unir serie de fehas completas e imputar de ser necesario
+cpi_completo <- tibble(date = fecha_completa) %>%
+  left_join(cpi, by = "date") %>%
+  arrange(date) %>%
+  fill(CPI, .direction = "down")  # Forward fill
+
+# se crea la serie temporal para el analisis con frecuencia diaria
+ts_cpi <- ts(cpi_completo$CPI, 
+             start = c(year(min(fecha_completa)), yday(min(fecha_completa))), 
+             frequency = 365)
+
+# 4. Graficar la serie temporal
+plot(ts_cpi, type = "l", main = "Serie Temporal CPI", ylab = "CPI", xlab = "Tiempo", col = "blue")
+
+
+
+```
+
+### Parte 2 – Análisis Fundamental
+
+```{r}
+# 1. Descomposición de la serie temporal
+decomp <- decompose(ts_cpi)
+plot(decomp)
+
+# Comentario sobre tendencia, estacionalidad y componente aleatorio
+# print(decomp$trend) # Puedes ver los valores si lo deseas
+# print(decomp$seasonal)
+# print(decomp$random)
+
+# 2. Autocorrelación y autocorrelación parcial
+acf(ts_cpi, main = "ACF de CPI")
+pacf(ts_cpi, main = "PACF de CPI")
+
+```
+
+**1. Descomposición de la serie temporal**
+
+**Tendencia:**\
+
+Se observa una tendencia creciente clara en el componente de tendencia, lo que indica que el CPI ha aumentado de manera sostenida a lo largo de los años. No hay caídas abruptas ni cambios de régimen, lo que sugiere una evolución gradual.
+
+**Estacionalidad:**\
+
+El componente estacional muestra un patrón repetitivo anual (aproximadamente cada año), típico de series con frecuencia diaria y estacionalidad anual. Esto es esperable en datos macroeconómicos como el CPI, que suelen tener ciclos asociados a estacionalidad (por ejemplo, aumentos en ciertas épocas del año).
+
+**Componente aleatorio (ruido):**\
+
+El componente aleatorio parece más ruidoso al inicio, pero no muestra patrones claros ni outliers extremos, aunque en algunos años hay mayor dispersión. Esto sugiere que el modelo aditivo está capturando bien la mayor parte de la estructura de la serie.
+
+**2. Función de autocorrelación (ACF)**
+
+**Observación:**\
+
+La ACF muestra autocorrelaciones muy altas y persistentes en prácticamente todos los lags. Los valores están muy por encima de los límites de significancia, lo que indica que la serie **no es estacionaria** y tiene fuerte dependencia temporal.
+
+**Conclusión:**\
+
+Esto es típico de series con tendencia o con estacionalidad fuerte. Antes de modelar con ARIMA, sería recomendable diferenciar la serie para lograr estacionariedad.
+
+**3. Función de autocorrelación parcial (PACF)**
+
+**Observación:**\
+
+La PACF muestra un pico muy alto en el primer lag y después cae abruptamente a valores cercanos a cero.
+
+**Conclusión:**\
+Este patrón es característico de una serie temporal con fuerte componente autoregresivo de primer orden (AR(1)) y tendencia, pero sugiere que después del primer lag, la influencia directa disminuye. Sin embargo, debido a la alta autocorrelación observada en la ACF, probablemente sea necesario diferenciar la serie para un modelado ARIMA adecuado.
+
+### Parte 3 – División en train y test
+
+```{r}
+n <- length(ts_cpi)
+train_n <- floor(0.8 * n)
+
+train_ts <- window(ts_cpi, end = time(ts_cpi)[train_n])
+test_ts <- window(ts_cpi, start = time(ts_cpi)[train_n + 1])
+
+```
+
+### **Parte 4 – Modelos de Forecasting (60 días adelante)**
+
+#### a) Holt-Winters
+
+```{r}
+hw_model <- HoltWinters(train_ts)
+hw_forecast <- forecast(hw_model, h = 60)
+plot(hw_forecast)
+# Calcular RMSE
+rmse_hw <- sqrt(mean((test_ts[1:60] - hw_forecast$mean)^2, na.rm = TRUE))
+
+```
+
+#### b) ARIMA/SARIMA (con auto.arima)
+
+```{r}
+arima_model <- auto.arima(train_ts)
+arima_forecast <- forecast(arima_model, h = 60)
+plot(arima_forecast)
+rmse_arima <- sqrt(mean((test_ts[1:60] - arima_forecast$mean)^2, na.rm = TRUE))
+
+```
+
+#### c) Redes Neuronales Autoregresivas (NNAR)
+
+```{r}
+nn_model <- nnetar(train_ts)
+nn_forecast <- forecast(nn_model, h = 60)
+plot(nn_forecast)
+rmse_nn <- sqrt(mean((test_ts[1:60] - nn_forecast$mean)^2, na.rm = TRUE))
+
+```
+
+### Parte 5 - Comparación de modelos y modelo final
+
+```{r}
+evalua_modelo <- function(final_model, final_forecast, test_ts, nombre_modelo = "Modelo") {
+  library(forecast)
+  
+  # 1. Métricas de evaluación
+  metricas <- accuracy(final_forecast, test_ts[1:60])
+  print(metricas)
+  
+  # 2. Análisis gráfico de residuos
+  residuos <- residuals(final_model)
+  residuos <- residuos[!is.na(residuos)]   # Elimina los NA
+  
+  par(mfrow = c(2,2))
+  plot(residuos, main = paste("Residuos del modelo", nombre_modelo), ylab = "Residuos")
+  hist(residuos, main = "Histograma de residuos", xlab = "Residuos")
+  acf(residuos, main = "ACF de residuos")
+  qqnorm(residuos, main = "Q-Q plot residuos")
+  qqline(residuos)
+  par(mfrow = c(1,1))
+  
+  # 3. Prueba de autocorrelación y normalidad de residuos
+  cat("\nPrueba de Ljung-Box para autocorrelación:\n")
+  print(Box.test(residuos, lag = 20, type = "Ljung-Box"))
+  
+  if(length(residuos) < 5000) {
+    cat("\nPrueba de normalidad (Shapiro-Wilk):\n")
+    print(shapiro.test(residuos))
+  }
+  
+  # 4. Conclusión automática
+  cat("\nModelo evaluado:", nombre_modelo, "\n")
+  cat("RMSE:", metricas[2], "\n")
+  cat("MAE:", metricas[3], "\n")
+  cat("MAPE:", metricas[5], "\n")
+}
+
+```
+
+```{r}
+evalua_modelo(hw_model, hw_forecast, test_ts, "Holt-Winters")
+```
+
+```{r}
+evalua_modelo(arima_model, arima_forecast, test_ts, "ARIMA/SARIMA")
+```
+
+```{r}
+evalua_modelo(nn_model, nn_forecast, test_ts, "NNAR")
+```
+
+**Conclusión comparativa de modelos de pronóstico CPI**
+
+Tras evaluar los modelos Holt-Winters, ARIMA/SARIMA y NNAR para el pronóstico del CPI, se observa lo siguiente:
+
+**1. Precisión predictiva (Test set)**
+
+**Holt-Winters** obtuvo el menor RMSE (0.1636), seguido de cerca por ARIMA/SARIMA (0.1718), y NNAR con un RMSE considerablemente más alto (0.2826).
+
+Los valores de MAE y MAPE muestran la misma tendencia: Holt-Winters y ARIMA/SARIMA presentan errores bajos y similares, mientras que NNAR es menos preciso.
+
+**2. Análisis de residuos**
+
+**Holt-Winters**:\
+
+Los residuos presentan cierta autocorrelación significativa (Box-Ljung p \< 2.2e-16), y la prueba de normalidad (Shapiro-Wilk p \< 2.2e-16) indica que no son normales. Visualmente, los residuos se distribuyen en torno a cero pero muestran colas y cierta estructura.
+
+**ARIMA/SARIMA**:\
+
+Los residuos no presentan autocorrelación significativa (Box-Ljung p = 1), lo que indica que el modelo logra capturar mejor la dinámica temporal de la serie. Sin embargo, tampoco cumplen la normalidad (Shapiro-Wilk p \< 2.2e-16), aunque su histograma y Q-Q plot muestran una ligera mejora respecto a Holt-Winters.
+
+**NNAR**:\
+
+Aunque los residuos de NNAR no muestran autocorrelación (Box-Ljung p = 1), el modelo presenta el mayor error de pronóstico. La distribución de los residuos es ligeramente más dispersa y no normal.
+
+**3. Interpretación y recomendación**
+
+**Si la prioridad es minimizar el error de pronóstico inmediato**, Holt-Winters es el mejor modelo, ya que obtiene el menor RMSE, MAE y MAPE en el set de prueba.
+
+**Sin embargo, ARIMA/SARIMA es el único modelo cuyos residuos se comportan como ruido blanco** (sin autocorrelación significativa), lo que es un criterio fundamental para la validez estadística y la robustez del modelo ante futuras predicciones.
+
+NNAR no aporta ventajas ni en precisión ni en diagnóstico de residuos en este caso.
+
+**Recomendación final**
+
+**ARIMA/SARIMA es el modelo más robusto para el pronóstico de CPI**, ya que combina una alta precisión predictiva con residuos que cumplen mejor los supuestos de independencia.
+
+**Holt-Winters es una alternativa válida cuando se prioriza el menor error absoluto inmediato** y la serie mantiene patrones estacionales y de tendencia estables, pero hay que ser cauteloso con la interpretación de intervalos de predicción debido a la autocorrelación residual.
+
+**NNAR no es recomendable para esta serie**, pues no supera a los modelos clásicos en ningún criterio clave.
+
+```{r}
+best_model <- "ARIMA/SARIMA"  # Cambia por el modelo que haya dado menor RMSE
+
+if (best_model == "Holt-Winters") {
+  final_model <- HoltWinters(ts_cpi)
+  final_forecast <- forecast(final_model, h = 60)
+} else if (best_model == "ARIMA/SARIMA") {
+  final_model <- auto.arima(ts_cpi)
+  final_forecast <- forecast(final_model, h = 60)
+} else if (best_model == "NNAR") {
+  final_model <- nnetar(ts_cpi)
+  final_forecast <- forecast(final_model, h = 60)
+}
+plot(final_forecast, main = paste("Forecast 60 días adelante con modelo", best_model))
+```
+
+```{r}
+# Graficar el forecast final} \
+# Extraer los últimos 120 valores reales y sus tiempos 
+n <- length(ts_cpi) 
+ultimos_120 <- ts_cpi[(n - 119):n] 
+tiempo_ultimos_120 <- time(ts_cpi)[(n - 119):n]
+
+# Calcular los tiempos para el forecast (60 días adelante)
+
+tiempo_forecast <- seq(max(tiempo_ultimos_120) + 1/frequency(ts_cpi), max(tiempo_ultimos_120) + 60/frequency(ts_cpi), by = 1/frequency(ts_cpi))
+
+# Supón que ya tienes: tiempo_ultimos_120 y tiempo_forecast (ambos en formato decimal)
+
+# Crea un vector con todas las fechas (reales y de forecast)
+
+fechas_plot <- c(tiempo_ultimos_120, tiempo_forecast)
+
+# Convierte los decimales de time(ts_cpi) a fechas reales
+
+# Primero, obtén la fecha de inicio de la serie real:
+
+fecha_inicio <- as.Date(as.character(start(ts_cpi)[1]), format = "%Y") + (start(ts_cpi)[2] - 1) 
+fechas_reales <- fecha_inicio + round(365 * (fechas_plot - start(ts_cpi)[1]))
+
+# Supón que 'fechas_reales' es el vector de fechas de tu gráfica
+
+# Extraer los primeros días de cada mes dentro del rango:
+
+meses_unicos <- unique(format(fechas_reales, "%Y-%m")) 
+ticks_mensuales <- as.Date(paste0(meses_unicos, "-01"))
+
+# Vuelve a graficar (el plot original)
+
+plot(fechas_reales[1:120], ultimos_120, type = "l", main = paste("Últimos 120 reales + Pronóstico 60 días (con IC) -", best_model), ylab = "CPI", xlab = "Fecha", col = "black", lwd = 2, xlim = c(fechas_reales[1], max(fechas_reales)), ylim = range(c(ultimos_120, final_forecast$lower, final_forecast$upper, final_forecast$mean), na.rm = TRUE), xaxt = "n") # Oculta el eje x por default
+
+# Banda IC
+
+polygon(c(fechas_reales[121:180], rev(fechas_reales[121:180])), c(final_forecast$lower[,2], rev(final_forecast$upper[,2])), col = rgb(0,0,1,0.2), border = NA) 
+
+lines(fechas_reales[121:180], final_forecast$mean, col = "blue", lwd = 2)
+
+lines(fechas_reales[121:180], final_forecast$lower[,2], col = "blue", lty = 2) 
+
+lines(fechas_reales[121:180], final_forecast$upper[,2], col = "blue", lty = 2)
+
+legend("topleft", legend = c("Últimos 120 reales", "Pronóstico", "IC 95%"), col = c("black", "blue", rgb(0,0,1,0.2)), lty = c(1,1,NA), lwd = c(2,2,NA), fill = c(NA, NA, rgb(0,0,1,0.2)), border = NA)
+
+# Eje X con meses y años (en formato abreviado)
+
+axis.Date(1, at = ticks_mensuales, format = "%b-%Y", las = 2, cex.axis = 0.8)
+```
+
+### **Conclusión sobre el pronóstico de CPI con ARIMA/SARIMA (60 días adelante)**
+
+El gráfico muestra los últimos 120 valores observados del CPI y el pronóstico a 60 días generado por el modelo ARIMA/SARIMA, incluyendo su intervalo de confianza al 95%. El modelo proyecta una evolución **ligeramente ascendente y estable** del CPI para el próximo bimestre, manteniendo la continuidad respecto al comportamiento reciente.
+
+El **intervalo de confianza** se amplía progresivamente hacia adelante, reflejando la incertidumbre inherente a toda predicción de series temporales. El pronóstico central (línea azul) es consistente con la tendencia de los datos más recientes, y el área sombreada azul claro indica la variabilidad esperada en torno a la predicción, sin anticipar fluctuaciones abruptas.
+
+Dada la robustez estadística observada en el análisis de residuos de ARIMA/SARIMA (sin autocorrelación significativa y comportamiento más cercano al ruido blanco), **este modelo no solo ofrece buena precisión, sino también confiabilidad estadística para la toma de decisiones basada en los intervalos de confianza**. Esto lo hace especialmente recomendable para escenarios donde la robustez del modelo es tan importante como el error absoluto de predicción.
+
+**En síntesis:**\
+
+*El pronóstico de ARIMA/SARIMA proporciona una estimación confiable y robusta de la evolución del CPI para los próximos 60 días, siendo adecuado para usos operativos, estratégicos y de gestión de riesgos. La coherencia entre el pronóstico y la tendencia reciente refuerza la utilidad del modelo para la planeación en ambientes económicos estables.*
