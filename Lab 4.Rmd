@@ -160,7 +160,18 @@ evalua_modelo <- function(final_model, final_forecast, test_ts, nombre_modelo = 
   metricas <- accuracy(final_forecast, test_ts[1:60])
   print(metricas)
   
-  # 2. Análisis gráfico de residuos
+  # 2. Gráfica de valores reales vs predicción 60 días adelante
+  predichos <- as.numeric(final_forecast$mean[1:60])
+  reales <- as.numeric(test_ts[1:60])
+  dias <- 1:60
+  plot(dias, reales, type = "l", col = "black", lwd = 2,
+       main = paste("Valores reales vs Predicción 60 días -", nombre_modelo),
+       ylab = "CPI", xlab = "Día", ylim = range(c(reales, predichos)))
+  lines(dias, predichos, col = "blue", lwd = 2)
+  legend("topleft", legend = c("Reales", "Predicción"),
+         col = c("black", "blue"), lty = 1, lwd = 2)
+  
+  # 3. Análisis gráfico de residuos
   residuos <- residuals(final_model)
   residuos <- residuos[!is.na(residuos)]   # Elimina los NA
   
@@ -172,7 +183,7 @@ evalua_modelo <- function(final_model, final_forecast, test_ts, nombre_modelo = 
   qqline(residuos)
   par(mfrow = c(1,1))
   
-  # 3. Prueba de autocorrelación y normalidad de residuos
+  # 4. Prueba de autocorrelación y normalidad de residuos
   cat("\nPrueba de Ljung-Box para autocorrelación:\n")
   print(Box.test(residuos, lag = 20, type = "Ljung-Box"))
   
@@ -181,12 +192,13 @@ evalua_modelo <- function(final_model, final_forecast, test_ts, nombre_modelo = 
     print(shapiro.test(residuos))
   }
   
-  # 4. Conclusión automática
+  # 5. Conclusión automática
   cat("\nModelo evaluado:", nombre_modelo, "\n")
   cat("RMSE:", metricas[2], "\n")
   cat("MAE:", metricas[3], "\n")
   cat("MAPE:", metricas[5], "\n")
 }
+
 
 ```
 
@@ -245,69 +257,80 @@ NNAR no aporta ventajas ni en precisión ni en diagnóstico de residuos en este 
 ```{r}
 best_model <- "ARIMA/SARIMA"  # Cambia por el modelo que haya dado menor RMSE
 
-if (best_model == "Holt-Winters") {
-  final_model <- HoltWinters(ts_cpi)
-  final_forecast <- forecast(final_model, h = 60)
-} else if (best_model == "ARIMA/SARIMA") {
-  final_model <- auto.arima(ts_cpi)
-  final_forecast <- forecast(final_model, h = 60)
-} else if (best_model == "NNAR") {
-  final_model <- nnetar(ts_cpi)
-  final_forecast <- forecast(final_model, h = 60)
-}
-plot(final_forecast, main = paste("Forecast 60 días adelante con modelo", best_model))
+final_model_hw <- HoltWinters(ts_cpi)
+final_forecast_hw <- forecast(final_model_hw, h = 60)
+final_model_arima <- auto.arima(ts_cpi)
+final_forecast_arima <- forecast(final_model_arima, h = 60)
+final_model_nnet <- nnetar(ts_cpi)
+final_forecast__nnet <- forecast(final_model_nnet, h = 60)
+
+```
+```{r}
+plot(final_forecast_hw, main = paste("Forecast 60 días adelante con modelo", "Holt-Winters"))
+```
+```{r}
+plot(final_forecast_arima, main = paste("Forecast 60 días adelante con modelo", "ARIMA/SARIMA"))
 ```
 
 ```{r}
-# Graficar el forecast final} \
-# Extraer los últimos 120 valores reales y sus tiempos 
-n <- length(ts_cpi) 
-ultimos_120 <- ts_cpi[(n - 119):n] 
-tiempo_ultimos_120 <- time(ts_cpi)[(n - 119):n]
+plot_forecast_120_60 <- function(ts_cpi, final_forecast, best_model = "Modelo") {
+  # Extraer los últimos 120 valores reales y sus tiempos
+  n <- length(ts_cpi)
+  ultimos_120 <- ts_cpi[(n - 119):n]
+  tiempo_ultimos_120 <- time(ts_cpi)[(n - 119):n]
+  
+  # Calcular los tiempos para el forecast (60 días adelante)
+  tiempo_forecast <- seq(max(tiempo_ultimos_120) + 1/frequency(ts_cpi), 
+                         max(tiempo_ultimos_120) + 60/frequency(ts_cpi), 
+                         by = 1/frequency(ts_cpi))
+  
+  # Unir tiempos reales y de forecast
+  fechas_plot <- c(tiempo_ultimos_120, tiempo_forecast)
+  
+  # Convertir tiempos decimales a fechas reales
+  fecha_inicio <- as.Date(as.character(start(ts_cpi)[1]), format = "%Y") + (start(ts_cpi)[2] - 1)
+  fechas_reales <- fecha_inicio + round(365 * (fechas_plot - start(ts_cpi)[1]))
+  
+  # Ticks mensuales para eje X
+  meses_unicos <- unique(format(fechas_reales, "%Y-%m"))
+  ticks_mensuales <- as.Date(paste0(meses_unicos, "-01"))
+  
+  # Gráfica principal
+  plot(fechas_reales[1:120], ultimos_120, type = "l",
+       main = paste("Últimos 120 reales + Pronóstico 60 días (con IC) -", best_model),
+       ylab = "CPI", xlab = "Fecha", col = "black", lwd = 2,
+       xlim = c(fechas_reales[1], max(fechas_reales)),
+       ylim = range(c(ultimos_120, final_forecast$lower, final_forecast$upper, final_forecast$mean), na.rm = TRUE),
+       xaxt = "n")
+  
+  # Banda IC
+  polygon(
+    c(fechas_reales[121:180], rev(fechas_reales[121:180])),
+    c(final_forecast$lower[,2], rev(final_forecast$upper[,2])),
+    col = rgb(0,0,1,0.2), border = NA
+  )
+  
+  lines(fechas_reales[121:180], final_forecast$mean, col = "blue", lwd = 2)
+  lines(fechas_reales[121:180], final_forecast$lower[,2], col = "blue", lty = 2)
+  lines(fechas_reales[121:180], final_forecast$upper[,2], col = "blue", lty = 2)
+  
+  legend("topleft",
+         legend = c("Últimos 120 reales", "Pronóstico", "IC 95%"),
+         col = c("black", "blue", rgb(0,0,1,0.2)),
+         lty = c(1,1,NA), lwd = c(2,2,NA),
+         fill = c(NA, NA, rgb(0,0,1,0.2)), border = NA, bty = "n")
+  
+  axis.Date(1, at = ticks_mensuales, format = "%b-%Y", las = 2, cex.axis = 0.8)
+}
 
-# Calcular los tiempos para el forecast (60 días adelante)
+```
+```{r}
+plot_forecast_120_60(ts_cpi, final_forecast_hw, best_model = "Holt-Winters")
 
-tiempo_forecast <- seq(max(tiempo_ultimos_120) + 1/frequency(ts_cpi), max(tiempo_ultimos_120) + 60/frequency(ts_cpi), by = 1/frequency(ts_cpi))
+```
+```{r}
+plot_forecast_120_60(ts_cpi, final_forecast_arima, best_model = "ARIMA/SARIMA")
 
-# Supón que ya tienes: tiempo_ultimos_120 y tiempo_forecast (ambos en formato decimal)
-
-# Crea un vector con todas las fechas (reales y de forecast)
-
-fechas_plot <- c(tiempo_ultimos_120, tiempo_forecast)
-
-# Convierte los decimales de time(ts_cpi) a fechas reales
-
-# Primero, obtén la fecha de inicio de la serie real:
-
-fecha_inicio <- as.Date(as.character(start(ts_cpi)[1]), format = "%Y") + (start(ts_cpi)[2] - 1) 
-fechas_reales <- fecha_inicio + round(365 * (fechas_plot - start(ts_cpi)[1]))
-
-# Supón que 'fechas_reales' es el vector de fechas de tu gráfica
-
-# Extraer los primeros días de cada mes dentro del rango:
-
-meses_unicos <- unique(format(fechas_reales, "%Y-%m")) 
-ticks_mensuales <- as.Date(paste0(meses_unicos, "-01"))
-
-# Vuelve a graficar (el plot original)
-
-plot(fechas_reales[1:120], ultimos_120, type = "l", main = paste("Últimos 120 reales + Pronóstico 60 días (con IC) -", best_model), ylab = "CPI", xlab = "Fecha", col = "black", lwd = 2, xlim = c(fechas_reales[1], max(fechas_reales)), ylim = range(c(ultimos_120, final_forecast$lower, final_forecast$upper, final_forecast$mean), na.rm = TRUE), xaxt = "n") # Oculta el eje x por default
-
-# Banda IC
-
-polygon(c(fechas_reales[121:180], rev(fechas_reales[121:180])), c(final_forecast$lower[,2], rev(final_forecast$upper[,2])), col = rgb(0,0,1,0.2), border = NA) 
-
-lines(fechas_reales[121:180], final_forecast$mean, col = "blue", lwd = 2)
-
-lines(fechas_reales[121:180], final_forecast$lower[,2], col = "blue", lty = 2) 
-
-lines(fechas_reales[121:180], final_forecast$upper[,2], col = "blue", lty = 2)
-
-legend("topleft", legend = c("Últimos 120 reales", "Pronóstico", "IC 95%"), col = c("black", "blue", rgb(0,0,1,0.2)), lty = c(1,1,NA), lwd = c(2,2,NA), fill = c(NA, NA, rgb(0,0,1,0.2)), border = NA)
-
-# Eje X con meses y años (en formato abreviado)
-
-axis.Date(1, at = ticks_mensuales, format = "%b-%Y", las = 2, cex.axis = 0.8)
 ```
 
 ### **Conclusión sobre el pronóstico de CPI con ARIMA/SARIMA (60 días adelante)**
