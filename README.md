@@ -30,14 +30,10 @@ econometria_r/
 Los siguientes paquetes son necesarios para ejecutar los laboratorios:
 
 ```r
-# Manipulación de datos
-install.packages("tidyverse")
-install.packages("dplyr")
-install.packages("tidyr")
-install.packages("readr")
+# Manipulación de datos y visualización base
+install.packages("tidyverse")  # Incluye: dplyr, tidyr, readr, ggplot2
 
-# Visualización
-install.packages("ggplot2")
+# Visualización adicional
 install.packages("GGally")
 install.packages("corrplot")
 install.packages("ggmap")  # Para visualizaciones geográficas
@@ -176,12 +172,13 @@ cd econometria_r
 
 ### 2. Instalar dependencias
 
-Abrir R o RStudio y ejecutar:
+Abrir R o RStudio y ejecutar los comandos de instalación según la sección de Requisitos.
 
 ```r
-# Instalar todos los paquetes necesarios
-source("install_packages.R")  # Si existe
-# O instalar manualmente según la sección de Requisitos
+# Ejemplo: instalar tidyverse (incluye muchos paquetes comunes)
+install.packages("tidyverse")
+install.packages("tidymodels")
+# ... y los demás paquetes listados en la sección de Requisitos
 ```
 
 ### 3. Ejecutar los laboratorios
