@@ -36,7 +36,7 @@ install.packages("tidyverse")  # Incluye: dplyr, tidyr, readr, ggplot2
 # Visualización adicional
 install.packages("GGally")
 install.packages("corrplot")
-install.packages("ggmap")  # Para visualizaciones geográficas
+install.packages("ggmap")  # Mapas geográficos (requiere API key)
 
 # Modelado
 install.packages("caret")
@@ -119,7 +119,7 @@ install.packages("MASS")
 
 **Autor:** Francisco González  
 **Carnet:** 24002914  
-**Dataset:** California Housing Prices  
+**Dataset:** Predicción de Precios de Viviendas en California  
 **Objetivos:**
 - Participar en una competencia de predicción de precios de viviendas
 - Aplicar técnicas avanzadas de machine learning
@@ -131,7 +131,7 @@ install.packages("MASS")
 1. **EDA Completo:**
    - Análisis de distribuciones
    - Matrices de correlación
-   - Visualizaciones geográficas con Google Maps
+   - Visualizaciones geográficas
    - Análisis de proximidad al océano
 
 2. **Modelos implementados:**
