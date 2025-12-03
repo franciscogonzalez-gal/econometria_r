@@ -68,7 +68,8 @@ install.packages("MASS")
 
 ### Laboratorio 2: Modelos de Regresión en R
 
-**Autor:** Francisco González  
+**Autor:** Francisco González
+**Carnet:** 24002914
 **Objetivos:**
 - Implementar una función de regresión lineal desde cero sin usar `lm()`
 - Comparar resultados con la función nativa de R
@@ -85,8 +86,8 @@ install.packages("MASS")
 
 ### Laboratorio 3: Predicción de Ventas Walmart
 
-**Autor:** Francisco González  
-**Carnet:** 24002914  
+**Autor:** Francisco González
+**Carnet:** 24002914
 **Objetivos:**
 - Análisis exploratorio de datos de ventas de Walmart
 - Predicción de ventas semanales
@@ -101,8 +102,8 @@ install.packages("MASS")
 
 ### Laboratorio 4: Series Temporales (CPI)
 
-**Autor:** Francisco González  
-**Carnet:** 24002914  
+**Autor:** Francisco González
+**Carnet:** 24002914
 **Objetivos:**
 - Análisis de series temporales del Índice de Precios al Consumidor (CPI)
 - Manejo de datos temporales con `lubridate`
@@ -117,9 +118,9 @@ install.packages("MASS")
 
 ### Proyecto Final: Competencia Kaggle
 
-**Autor:** Francisco González  
-**Carnet:** 24002914  
-**Dataset:** Predicción de Precios de Viviendas en California  
+**Autor:** Francisco González
+**Carnet:** 24002914
+**Dataset:** Predicción de Precios de Viviendas en California
 **Objetivos:**
 - Participar en una competencia de predicción de precios de viviendas
 - Aplicar técnicas avanzadas de machine learning
