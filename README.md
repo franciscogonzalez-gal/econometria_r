@@ -1,5 +1,13 @@
 # Econometría con R
 
+![R](https://img.shields.io/badge/R-276DC3?style=for-the-badge&logo=r&logoColor=white)
+![RStudio](https://img.shields.io/badge/RStudio-75AADB?style=for-the-badge&logo=rstudio&logoColor=white)
+![Tidyverse](https://img.shields.io/badge/Tidyverse-1A162D?style=for-the-badge&logo=tidyverse&logoColor=white)
+![dplyr](https://img.shields.io/badge/dplyr-1F65CC?style=for-the-badge&logo=r&logoColor=white)
+![ggplot2](https://img.shields.io/badge/ggplot2-E46726?style=for-the-badge&logo=r&logoColor=white)
+![Markdown](https://img.shields.io/badge/Markdown-000000?style=for-the-badge&logo=markdown&logoColor=white)
+![License](https://img.shields.io/badge/License-CC0_1.0-lightgrey?style=for-the-badge)
+
 Este repositorio contiene una colección de laboratorios y proyectos de econometría desarrollados en R, enfocados en técnicas de análisis de datos, modelado predictivo y series temporales.
 
 ## 📋 Descripción del Proyecto
